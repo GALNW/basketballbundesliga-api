@@ -1,7 +1,36 @@
 import { NextResponse } from "next/server";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
+const allowedOrigins = [
+    "https://giessen-46ers.webflow.io",
+    "https://giessen-46ers.canvas.webflow.com",
+    "https://giessen46ers.de",
+    "https://www.giessen46ers.de",
+];
+
+function getCorsHeaders(origin: string | null) {
+  const headers: Record<string, string> = {
+    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Max-Age": "86400",
+    "Vary": "Origin",
+  };
+  if (origin && allowedOrigins.includes(origin)) {
+    headers["Access-Control-Allow-Origin"] = origin;
+  }
+  return headers;
+}
+
+export async function OPTIONS(request: Request) {
+  const origin = request.headers.get("origin");
+  return new Response(null, {
+    status: 204,
+    headers: getCorsHeaders(origin),
+  });
+}
+
 export async function GET(request: Request) {
+    const origin = request.headers.get("origin");
     const { env } = getCloudflareContext();
     const apiKey = env.LIGA_API_KEY;
 
@@ -24,7 +53,7 @@ export async function GET(request: Request) {
         if (!response.ok) {
             return NextResponse.json(
                 { error: 'Fehler beim Abruf der Liga-API' },
-                { status: 502 },
+                { status: 502, headers: getCorsHeaders(origin) },
             );
         }
 
@@ -32,13 +61,14 @@ export async function GET(request: Request) {
 
         return NextResponse.json(data, {
             headers: {
+                ...getCorsHeaders(origin),
                 'Cache-Control': 'public, max-age=3600',
             }
         });
     } catch (error) {
         return NextResponse.json(
             { error: 'Interner Serverfehler' },
-            { status: 500 },
+            { status: 500, headers: getCorsHeaders(origin) },
         );
     }
 }
