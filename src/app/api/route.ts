@@ -1,28 +1,33 @@
-import { NextResponse } from "next/server";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { NextResponse } from 'next/server';
+import { getCloudflareContext } from '@opennextjs/cloudflare';
 
 const allowedOrigins = [
-    "https://giessen-46ers.webflow.io",
-    "https://giessen-46ers.canvas.webflow.com",
-    "https://giessen46ers.de",
-    "https://www.giessen46ers.de",
+    'https://giessen-46ers.webflow.io',
+    'https://giessen-46ers.canvas.webflow.com',
+    'https://giessen46ers.de',
+    'https://www.giessen46ers.de',
 ];
+
+const allowedTypes = [
+    'spielplan',
+    'tabelle',
+]
 
 function getCorsHeaders(origin: string | null) {
   const headers: Record<string, string> = {
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Access-Control-Max-Age": "86400",
-    "Vary": "Origin",
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Max-Age': '86400',
+    'Vary': 'Origin',
   };
   if (origin && allowedOrigins.includes(origin)) {
-    headers["Access-Control-Allow-Origin"] = origin;
+    headers['Access-Control-Allow-Origin'] = origin;
   }
   return headers;
 }
 
 export async function OPTIONS(request: Request) {
-  const origin = request.headers.get("origin");
+  const origin = request.headers.get('origin');
   return new Response(null, {
     status: 204,
     headers: getCorsHeaders(origin),
@@ -30,7 +35,7 @@ export async function OPTIONS(request: Request) {
 }
 
 export async function GET(request: Request) {
-    const origin = request.headers.get("origin");
+    const origin = request.headers.get('origin');
     const { env } = getCloudflareContext();
     const apiKey = env.LIGA_API_KEY;
 
@@ -44,8 +49,18 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const liga = url.searchParams.get('liga') || 'proa';
     const saison = url.searchParams.get('saison') || '2017-2018';
+    const typ = url.searchParams.get('typ') || 'spielplan';
 
-    const apiUrl = `https://api.2basketballbundesliga.de/spielplan/${liga}/${saison}/${apiKey}`;
+    if (!allowedTypes.includes(typ)) {
+        return NextResponse.json(
+            { error: 'Ungültiger Typ' },
+            { status: 400, headers: getCorsHeaders(origin) },
+        );
+    }
+
+    const apiUrl = typ === 'tabelle'
+        ? `https://api.2basketballbundesliga.de/${typ}_${liga}/${apiKey}`
+        : `https://api.2basketballbundesliga.de/${typ}/${liga}/${saison}/${apiKey}`;
 
     try {
         const response = await fetch(apiUrl);
