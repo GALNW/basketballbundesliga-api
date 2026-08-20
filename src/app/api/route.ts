@@ -67,7 +67,7 @@ export async function GET(request: Request) {
 
         if (!response.ok) {
             return NextResponse.json(
-                { error: `Fehler beim Abruf der Liga-API, ${apiUrl}` },
+                { error: 'Fehler beim Abruf der Liga-API' },
                 { status: 502, headers: getCorsHeaders(origin) },
             );
         }
