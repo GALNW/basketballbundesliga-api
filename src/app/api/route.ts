@@ -1,11 +1,11 @@
-import { NextResponse } from "next/server";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { NextResponse } from 'next/server';
+import { getCloudflareContext } from '@opennextjs/cloudflare';
 
 const allowedOrigins = [
-    "https://giessen-46ers.webflow.io",
-    "https://giessen-46ers.canvas.webflow.com",
-    "https://giessen46ers.de",
-    "https://www.giessen46ers.de",
+    'https://giessen-46ers.webflow.io',
+    'https://giessen-46ers.canvas.webflow.com',
+    'https://giessen46ers.de',
+    'https://www.giessen46ers.de',
 ];
 
 const allowedTypes = [
@@ -15,19 +15,19 @@ const allowedTypes = [
 
 function getCorsHeaders(origin: string | null) {
   const headers: Record<string, string> = {
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Access-Control-Max-Age": "86400",
-    "Vary": "Origin",
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Max-Age': '86400',
+    'Vary': 'Origin',
   };
   if (origin && allowedOrigins.includes(origin)) {
-    headers["Access-Control-Allow-Origin"] = origin;
+    headers['Access-Control-Allow-Origin'] = origin;
   }
   return headers;
 }
 
 export async function OPTIONS(request: Request) {
-  const origin = request.headers.get("origin");
+  const origin = request.headers.get('origin');
   return new Response(null, {
     status: 204,
     headers: getCorsHeaders(origin),
@@ -35,7 +35,7 @@ export async function OPTIONS(request: Request) {
 }
 
 export async function GET(request: Request) {
-    const origin = request.headers.get("origin");
+    const origin = request.headers.get('origin');
     const { env } = getCloudflareContext();
     const apiKey = env.LIGA_API_KEY;
 
