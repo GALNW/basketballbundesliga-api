@@ -53,7 +53,7 @@ export async function GET(request: Request) {
 
     if (!allowedTypes.includes(typ)) {
         return NextResponse.json(
-            { error: 'Ungültiger Typ. Erlaubt: spielplan, tabelle' },
+            { error: 'Ungültiger Typ' },
             { status: 400, headers: getCorsHeaders(origin) },
         );
     }
