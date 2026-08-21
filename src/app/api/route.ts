@@ -11,7 +11,13 @@ const allowedOrigins = [
 const allowedTypes = [
     'spielplan',
     'tabelle',
-]
+];
+
+const allowedStatus = [
+    'all',
+    'past', 
+    'future',
+];
 
 function getCorsHeaders(origin: string | null) {
   const headers: Record<string, string> = {
@@ -34,6 +40,50 @@ export async function OPTIONS(request: Request) {
   });
 }
 
+function getPreviousSeason(saison: string): string {
+    const [year1, year2] = saison.split('-').map(Number);
+    return `${year1 - 1}-${year2 - 1}`;
+}
+
+function filterAndSortGamesByStatus(data: any, status: string) {
+    if (status === 'all' || typeof data !== 'object' || data === null) {
+        return data;
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    const filtered: Record<string, any[]> = {};
+
+    for (const [day, games] of Object.entries(data)) {
+        if (!Array.isArray(games)) continue;
+
+        const dayGames = games.filter((game: any) => {
+            if (!game.datetime) return true;
+            const isPast = game.datetime < now;
+            return status === 'past' ? isPast : !isPast;
+        });
+
+        dayGames.sort((a: any, b: any) => {
+            return status === 'past'
+                ? b.datetime - a.datetime
+                : a.datetime - b.datetime;
+        });
+
+        if (dayGames.length > 0) {
+            filtered[day] = dayGames;
+        }
+    }
+
+    return filtered;
+}
+
+function hasGames(data: any): boolean {
+    if (typeof data !== 'object' || data === null) return false;
+    for (const games of Object.values(data)) {
+        if (Array.isArray(games) && games.length > 0) return true;
+    }
+    return false;
+}
+
 export async function GET(request: Request) {
     const origin = request.headers.get('origin');
     const { env } = getCloudflareContext();
@@ -50,6 +100,7 @@ export async function GET(request: Request) {
     const liga = url.searchParams.get('liga') || 'proa';
     const saison = url.searchParams.get('saison') || '2017-2018';
     const typ = url.searchParams.get('typ') || 'spielplan';
+    const status = url.searchParams.get('status') || 'all';
 
     if (!allowedTypes.includes(typ)) {
         return NextResponse.json(
@@ -58,21 +109,48 @@ export async function GET(request: Request) {
         );
     }
 
-    const apiUrl = typ === 'tabelle'
-        ? `https://api.2basketballbundesliga.de/${typ}_${liga}/${apiKey}`
-        : `https://api.2basketballbundesliga.de/${typ}/${liga}/${saison}/${apiKey}`;
+    if (!allowedStatus.includes(status)) {
+        return NextResponse.json(
+            { error: 'Ungültiger Status. Erlaubte Werte: past, future' },
+            { status: 400, headers: getCorsHeaders(origin) },
+        );
+    }
+
+    let currentSaison = saison;
+    let data: any = {};
+    let attempts = 0;
+    const maxAttempts = 10;
 
     try {
-        const response = await fetch(apiUrl);
+        while (attempts < maxAttempts) {
+            attempts++;
 
-        if (!response.ok) {
-            return NextResponse.json(
-                { error: 'Fehler beim Abruf der Liga-API' },
-                { status: 502, headers: getCorsHeaders(origin) },
-            );
+            const apiUrl = typ === 'tabelle'
+                ? `https://api.2basketballbundesliga.de/${typ}_${liga}/${apiKey}`
+                : `https://api.2basketballbundesliga.de/${typ}/${liga}/${currentSaison}/${apiKey}`;
+
+            const response = await fetch(apiUrl);
+
+            if (!response.ok) {
+                return NextResponse.json(
+                    { error: 'Fehler beim Abruf der Liga-API' },
+                    { status: 502, headers: getCorsHeaders(origin) },
+                );
+            }
+
+            data = await response.json();
+
+            if (typ === 'spielplan') {
+                data = filterAndSortGamesByStatus(data, status);
+
+                if (status === 'past' && !hasGames(data)) {
+                    currentSaison = getPreviousSeason(currentSaison);
+                    continue;
+                }
+            }
+
+            break;
         }
-
-        const data = await response.json();
 
         return NextResponse.json(data, {
             headers: {
